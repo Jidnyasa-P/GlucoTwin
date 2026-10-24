@@ -1,0 +1,4 @@
+patient_id,age_years,sex,bmi,diabetes_years,hba1c_prior_pct,diagnosis,medications,source,generator
+SYNTH-001,52,M,33.8,7.1,8.3,Type 2 diabetes mellitus (SYNTHETIC record),metformin,SYNTHETIC,synthetic-generator-v1
+SYNTH-002,72,F,23.9,2.3,7.5,Type 2 diabetes mellitus (SYNTHETIC record),metformin,SYNTHETIC,synthetic-generator-v1
+SYNTH-003,47,M,26.3,1.6,7.9,Type 2 diabetes mellitus (SYNTHETIC record),metformin + DPP-4 inhibitor,SYNTHETIC,synthetic-generator-v1

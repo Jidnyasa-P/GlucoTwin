@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+data/generated/
+data/runtime/
+data/real_prepared/
+data/raw/
+models/ablations/
+models_real/
+*.sqlite
+.DS_Store

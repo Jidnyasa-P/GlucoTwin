@@ -1,16 +1,70 @@
-"""Train a demonstration next-step model and save a portable joblib artifact."""
+#!/usr/bin/env python
+"""Train baselines + LightGBM variants on the TRAIN patients, select the primary variant on VAL_SELECT,
+calibrate prediction intervals on VAL_CALIBRATE.  The TEST patients are never read here.
+
+    python scripts/train.py [--data data/generated] [--out models]
+"""
+import argparse, json, sys, time
 from pathlib import Path
-import sys
-sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
-import joblib,pandas as pd
-from glucotwin.data import generate_glucose_series
-from glucotwin.features import build_supervised,FEATURES
-from sklearn.ensemble import HistGradientBoostingRegressor
-root=Path(__file__).resolve().parents[1]
-frames=[generate_glucose_series(f'TRAIN-{i:03d}',n=600,seed=500+i) for i in range(20)]
-profiles={f'TRAIN-{i:03d}':{'age_years':30+(i*7)%45,'diabetes_duration_years':1+(i*3)%20,'hba1c_percent':6.0+(i%10)*.22} for i in range(20)}
-sup=build_supervised(pd.concat(frames,ignore_index=True),horizon_steps=1,profiles=profiles)
-model=HistGradientBoostingRegressor(max_iter=120,learning_rate=.07,max_leaf_nodes=15,l2_regularization=2.0,random_state=42).fit(sup[FEATURES],sup.target)
-(root/'models').mkdir(exist_ok=True)
-joblib.dump({'model':model,'features':FEATURES,'version':'synthetic-hgb-next-step-v1'},root/'models/glucotwin_demo.joblib')
-print(f'Saved demonstration model; training windows={len(sup)}; synthetic only.')
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import joblib
+import numpy as np
+
+from glucotwin.config import GLOBAL_SEED, PARSIMONY_REL_TOL
+from glucotwin.evaluation.protocol import assert_no_leakage, build_dataset, make_splits
+from glucotwin.forecasting.features import VARIANTS, VARIANT_DESCRIPTIONS
+from glucotwin.forecasting.models import GlucoModel, PersistenceForecaster, RidgeForecaster
+from glucotwin.forecasting.pipeline import features_for, mean_val_mae, train_matrix
+from glucotwin.ingestion.loaders import load_cohort
+
+ap = argparse.ArgumentParser()
+ap.add_argument("--data", default="data/generated")
+ap.add_argument("--out", default="models")
+ap.add_argument("--seed", type=int, default=GLOBAL_SEED)
+a = ap.parse_args()
+out = Path(a.out); (out / "ablations").mkdir(parents=True, exist_ok=True)
+
+t0 = time.time()
+readings, profiles = load_cohort(a.data)
+sources = sorted(readings["source"].unique())
+splits = make_splits(profiles.patient_id, a.seed); assert_no_leakage(splits)
+print("data sources:", sources, "| split sizes:", {k: len(v) for k, v in splits.items()})
+tr = build_dataset(readings, profiles, splits["train"])
+vs = build_dataset(readings, profiles, splits["val_select"])
+vc = build_dataset(readings, profiles, splits["val_calibrate"])      # NOTE: splits['test'] is never loaded here
+print(f"train windows {int(tr.valid_input.sum()):,} | val_select {int(vs.valid_input.sum()):,} | val_cal {int(vc.valid_input.sum()):,}")
+
+val = {}
+pers = PersistenceForecaster()
+Xv0, Yv, _ = train_matrix(vs, "cgm")
+val["persistence"] = {"val_select_mean_mae": mean_val_mae(pers.predict(Xv0), Yv)}
+
+Xt0, Yt0, _ = train_matrix(tr, "cgm")
+ridge = RidgeForecaster().fit(Xt0, Yt0)
+val["ridge_cgm"] = {"val_select_mean_mae": mean_val_mae(ridge.predict(Xv0), Yv)}
+joblib.dump(ridge, out / "ablations" / "ridge_cgm.joblib")
+
+models = {}
+for v in VARIANTS:                                    # fixed hyper-parameters (config.LGBM_PARAMS): no search on any split
+    Xt, Yt, _ = train_matrix(tr, v); Xv, Yv_, _ = train_matrix(vs, v); Xc, Yc, _ = train_matrix(vc, v)
+    m = GlucoModel(v, seed=a.seed).fit(Xt, Yt)
+    val[f"lgbm_{v}"] = {"val_select_mean_mae": mean_val_mae(m._point(Xv), Yv_), "description": VARIANT_DESCRIPTIONS[v]}
+    m.calibrate(Xc, Yc)
+    models[v] = m
+    m.save(out / "ablations" / f"lgbm_{v}.joblib")
+    print(f"  variant {v:13s} val_select mean MAE = {val[f'lgbm_{v}']['val_select_mean_mae']:.3f} mg/dL")
+
+# pre-declared parsimony rule: simplest variant whose validation MAE is within PARSIMONY_REL_TOL of the best
+scores = {v: val[f"lgbm_{v}"]["val_select_mean_mae"] for v in VARIANTS}
+best = min(scores.values())
+chosen = next(v for v in VARIANTS if scores[v] <= best * (1 + PARSIMONY_REL_TOL))
+primary = models[chosen]
+primary.save(out / "glucotwin_model.joblib")
+sel = {"seed": a.seed, "data_sources": sources, "splits": {k: len(v) for k, v in splits.items()},
+       "rule": f"simplest variant within {PARSIMONY_REL_TOL:.0%} of best validation MAE (val_select patients only)",
+       "validation": val, "chosen_variant": chosen, "model_version": primary.version,
+       "n_calibration_rows": primary.n_calibration, "conformal_q_mgdl": [round(float(x), 3) for x in primary.conformal_q]}
+Path("experiments").mkdir(exist_ok=True)
+Path("experiments/model_selection.json").write_text(json.dumps(sel, indent=2))
+print(f"\nchosen primary variant: {chosen}  ->  {primary.version}   ({time.time() - t0:.0f}s)")

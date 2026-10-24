@@ -1,2 +1,0 @@
-patient_id,provenance,age_years,diabetes_type,diabetes_duration_years,hba1c_percent,medication_history
-SYNTH-001,SYNTHETIC DEMONSTRATION DATA,54,Type 2 (synthetic profile),8,7.4,Example historical context only; not a recommendation

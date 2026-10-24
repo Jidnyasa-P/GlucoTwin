@@ -1,0 +1,3 @@
+# Only needed if the ShanghaiT2DM files you downloaded are Excel (.xls/.xlsx)
+openpyxl
+xlrd

@@ -1,0 +1,50 @@
+{
+  "seed": 2026,
+  "data_sources": [
+    "SYNTHETIC"
+  ],
+  "splits": {
+    "train": 60,
+    "val_select": 10,
+    "val_calibrate": 10,
+    "test": 20
+  },
+  "rule": "simplest variant within 1% of best validation MAE (val_select patients only)",
+  "validation": {
+    "persistence": {
+      "val_select_mean_mae": 25.512880514715008
+    },
+    "ridge_cgm": {
+      "val_select_mean_mae": 19.18158149029046
+    },
+    "lgbm_cgm": {
+      "val_select_mean_mae": 18.504033346212232,
+      "description": "CGM-derived features only (last 60 min)"
+    },
+    "lgbm_cgm_tod": {
+      "val_select_mean_mae": 15.127529362320596,
+      "description": "CGM features + local time of day"
+    },
+    "lgbm_cgm_personal": {
+      "val_select_mean_mae": 17.73202709885301,
+      "description": "CGM features + patient baseline from the first 48 h (personalization)"
+    },
+    "lgbm_cgm_static": {
+      "val_select_mean_mae": 18.86023060901537,
+      "description": "CGM features + static EHR fields (HbA1c, age, BMI, diabetes duration)"
+    }
+  },
+  "chosen_variant": "cgm_tod",
+  "model_version": "glucotwin-lgbm-cgm_tod-b09655ec",
+  "n_calibration_rows": 10591,
+  "conformal_q_mgdl": [
+    9.535,
+    14.554,
+    19.973,
+    23.885,
+    26.801,
+    28.328,
+    29.326,
+    30.704
+  ]
+}

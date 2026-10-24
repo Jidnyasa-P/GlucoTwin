@@ -1,169 +1,153 @@
-# GlucoTwin: An Explainable, Personalized Glucose Digital Twin
+# GlucoTwin - an explainable, personalized glucose Digital Twin (research proof of concept)
 
-**Digital Twin Challenge 2026 · student proof of concept · synthetic data only**
+> **Safety disclaimer.** GlucoTwin is an educational research proof of concept. It is not clinically validated and must not be used to diagnose, treat, or make medication decisions. All demonstration patient records are synthetic unless explicitly identified otherwise. Forecasts may be wrong, and the prototype is not a substitute for professional medical judgment.
+>
+> **Every result in this repository comes from SYNTHETIC data.** It shows that the pipeline works and how the models compare *on the synthetic generator*. It says nothing about real patients, about type 2 diabetes in India, or about clinical usefulness.
 
-> **Safety:** GlucoTwin is an educational research prototype. It is not clinically validated and must not be used to diagnose, treat, make insulin/medication decisions, or replace professional medical judgment. Forecasts may be wrong. The included patient and glucose data are synthetic.
+## Challenge checklist (Digital Twin Challenge 2026)
 
-## Team and submission details
+| # | Item | Status |
+|---|---|---|
+| 1 | Team details | **[TEAM NAME, MEMBERS, ROLES - to be filled by the team]** |
+| 2 | College / incubator | **[COLLEGE / INCUBATOR - to be filled]** |
+| 3 | Project title | GlucoTwin: an explainable, personalized glucose Digital Twin (*name provisional, see Known issues*) |
+| 4 | Problem statement | See [Problem statement](#problem-statement) |
+| 5 | Healthcare use case | See [Healthcare use case](#healthcare-use-case) |
+| 6 | Technical stack | See [Technical stack](#technical-stack) |
+| 7 | AI/ML model details | See [Model](#model) |
+| 8 | Public demo video (>= 20 min) | **[DEMO VIDEO URL - not yet recorded; plan in [`docs/DEMO_VIDEO_PLAN.md`](docs/DEMO_VIDEO_PLAN.md)]** |
+| 9 | Open-source licence | MIT - [`LICENSE`](LICENSE); third-party notices in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) |
+| 10 | Architecture diagram (PDF) | [`docs/architecture.pdf`](docs/architecture.pdf) |
+| 11 | Presentation (PDF/PPT) | [`docs/presentation.pdf`](docs/presentation.pdf) / [`docs/presentation.pptx`](docs/presentation.pptx) |
+| 12 | Files and links publicly accessible | **[TO CONFIRM after the repository is made public]**; remaining items in [`docs/SUBMISSION_CHECKLIST.md`](docs/SUBMISSION_CHECKLIST.md) |
 
-- **Team:** `[Add team name and member names]`
-- **College/incubator:** `[Add verified institution/incubator details]`
-- **Team leader:** `[Complete privately on the official submission platform; do not commit phone/email here]`
-- **Demo video (20 minutes minimum):** `[Add public/unlisted video URL after recording and access-checking]`
-- **Public repository:** `[Add repository URL after publishing]`
+## Problem statement
+Clinicians see a person's diabetes through sparse snapshots (visits, lab values), while a continuous glucose monitor (CGM) produces a reading every few minutes. GlucoTwin asks: can a **virtual patient state** that fuses historical (EHR-style) information with the live CGM stream, and updates with every new reading, support a **0-120 minute glucose forecast** that is explainable, comes with honest uncertainty, and refuses to answer when its input is unreliable?
 
-These placeholders are intentional; team details and a recorded video were not supplied and are not fabricated.
+## Healthcare use case
+Type 2 diabetes review support: a clinician-facing view of where a patient's glucose is heading, why the model thinks so, how reliable the input is, and how the forecast reacts to hypothetical changes in recent readings. Context: the ICMR-INDIAB study estimated about 101 million people with diabetes (11.4%) and 136 million with prediabetes (15.3%) in India (Anjana et al., *Lancet Diabetes Endocrinol* 2023; figures as reported by secondary coverage - verify against the paper). **Usefulness is a motivation here, not something this project demonstrates.**
 
-## Problem and use case
+## Features
+* **Data fusion**: static profile with per-field provenance + 15-minute CGM stream -> one persisted twin state (SQLite) that survives restarts.
+* **Continuous update loop**: validate -> quarantine or append -> quality check -> forecast or withhold -> explain -> audit (every step logged).
+* **Forecasts** for 15-120 minutes with 80% split-conformal intervals; every forecast stores its origin, model version and inputs; previous forecasts are kept and compared.
+* **Data-quality behaviour**: rejects naive/future timestamps, NaN, non-numeric and out-of-range values; ignores identical duplicates; quarantines conflicting duplicates; withholds the forecast when the stream is stale (> 20 min) or the 60-min window is incomplete (no imputation); flags out-of-distribution input.
+* **Explanations**: exact additive LightGBM feature contributions (sum verified against the model output) with stated causal limits.
+* **Scenario lab**: model-based hypothetical changes to recent glucose, clearly labelled; meal/exercise/medication controls disabled because the model has no such inputs.
+* **Dashboard** (Streamlit): overview, forecast, explanation, scenario lab, quality + audit, model performance; empty state; SYNTHETIC badge and disclaimer always visible.
+* **Rigorous evaluation**: patient-disjoint splits, per-patient calibration period, baselines on identical cases, patient-bootstrap CIs, ablations (reported even when negative), abstention accounting, failure analysis.
 
-Glucose values change between clinical visits. A single reading or static history does not show short-term trajectory. GlucoTwin demonstrates how historical patient context and a dynamic glucose stream can be joined into an auditable virtual state, then used to forecast future glucose and communicate data quality, model limitations, and hypothetical scenarios to a clinician/researcher. The task is glucose forecasting, not diagnosis or treatment selection.
+### Screenshots
+Real browser screenshots are **TODO** (the build environment had no browser) - see [`docs/demo_screenshots/README.md`](docs/demo_screenshots/README.md). Renders of the same engine outputs (matplotlib, SYNTHETIC patient SYNTH-001):
 
-## Implemented capabilities
+| Forecast (an honest miss: the breakfast spike escapes the interval) | Explanation |
+|---|---|
+| ![forecast](docs/figures/demo_forecast.png) | ![explanation](docs/figures/demo_explanation.png) |
+| **Scenario lab** | **Forecast withheld (stream stopped)** |
+| ![scenario](docs/figures/demo_scenario.png) | ![withheld](docs/figures/demo_withheld.png) |
 
-- Synthetic historical profile plus timestamped glucose observations, with explicit provenance.
-- Virtual patient state that updates on accepted new readings.
-- Validation for malformed timestamps, unsupported values, duplicate timestamps, and out-of-order observations.
-- Staleness, low-observation-count and gap warnings.
-- Recursive next-step forecasting with a HistGradientBoostingRegressor model trained on synthetic sequences.
-- Persistence baseline and a fixed-seed, patient-separated synthetic benchmark at a 30-minute target horizon.
-- Descriptive input summaries (recent level, short-term slope, recent variability); these are not causal explanations or SHAP attributions.
-- An illustrative residual-based uncertainty band. It is not calibrated for clinical use and widens heuristically with forecast horizon.
-- What-if perturbation of recent glucose inputs, explicitly labeled hypothetical and non-causal.
-- Session audit events and append-only local JSONL audit output.
-- Streamlit dashboard and automated tests.
+## Architecture and data flow
+![architecture](docs/architecture.png)
 
-### Important implementation boundary
-
-Historical fields are represented in the state and are included as static model features (age, diabetes duration, HbA1c) alongside glucose lags and time-of-day features. The current benchmark does not isolate the incremental contribution of the static fields, and their synthetic associations are not clinical evidence. The synthetic sample profile is not a Synthea export. No live device, clinician system, or real patient record is connected.
-
-## Architecture
-
-```mermaid
-flowchart TD
-  A[Historical profile<br/>synthetic context] --> C[Ingestion and validation]
-  B[Timestamped glucose stream<br/>synthetic demo] --> C
-  C --> D[Virtual patient state]
-  D --> E[Data-quality and stale-stream checks]
-  D --> F[Forecasting model]
-  F --> G[Input summaries and heuristic interval]
-  E --> H[Dashboard and safe warnings]
-  G --> H
-  D --> I[Audit history and forecast history]
-  I --> H
-  J[Patient-separated benchmark] --> F
 ```
-
-See `docs/architecture.pdf` and `docs/architecture.pptx`.
-
-## Research context and technical gaps
-
-This is an integration-focused PoC, not a claim to invent digital twins or glucose prediction. The current Unstop challenge listing describes fusion of historical EHR context and dynamic sensor streams and requires a public repository plus architecture and presentation files; it currently lists the prototype submission deadline as 20 October 2026 at 7:00 PM IST. Confirm details on the official listing before submission: https://unstop.com/hackathons/digital-twin-challenge-2026-happiest-health-1757873. The targeted research and challenge-verification notes, including links and dataset caveats, are in `docs/research_notes.md`. A 2024 scoping review notes healthcare digital twins are an emerging field and highlights data interoperability, privacy/security and the need for patient-specific, evolving representations. A 2025 meta-review identifies data quality, ethics, scalability, interoperability and clinical validation as ongoing barriers. Those findings motivate provenance labels, quality gates, audit history and conservative claims in this project.
-
-- Katsoulakis et al. *Digital twins for health: a scoping review*. npj Digital Medicine 7, 77 (2024). https://doi.org/10.1038/s41746-024-01073-0 (open access CC BY 4.0 per article).
-- Ringeval et al. *Advancing Health Care With Digital Twins: Meta-Review of Applications and Implementation Challenges*. Journal of Medical Internet Research 27, e69544 (2025). https://doi.org/10.2196/69544.
-- Prioleau et al. *DiaTrend: A dataset from advanced diabetes technology to enable development of novel analytic solutions*. Scientific Data 10, 556 (2023). https://doi.org/10.1038/s41597-023-02469-5. The dataset is a potential next step, but no dataset access or data-file license was assumed here.
-- Synthea synthetic patient generator: https://github.com/synthetichealth/synthea.
-- Twin Health commercial personalized metabolic-health offering: https://www.twinhealth.com/ (commercial product example; not independently benchmarked here).
-
-**Opportunity for future research:** test on an authorized real CGM dataset, evaluate patient-specific adaptation, calibrate prediction intervals on validation data, test robustness to missingness and drift, and obtain clinical review. None of these should be represented as completed or clinically validated in this version.
-
-## Requirements
-
-Python 3.10+ recommended. Dependencies are listed in `requirements.txt`.
-
-### Setup (Windows PowerShell)
-
-```powershell
-cd GlucoTwin
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-python scripts/generate_synthetic_data.py
+history profile ─┐                                   ┌─> forecast (15..120 min) + 80% interval ─┐
+                 ├─> validate/quarantine ─> twin ────┤                                          ├─> dashboard
+CGM stream ──────┘   (quality gate)        state    └─> explanation, revision, audit trail ────┘
+                                         (SQLite)        └─> scenario lab (HYPOTHETICAL)
 ```
+Package layout (`glucotwin/`): `ingestion/` (loaders, ShanghaiT2DM adapter), `data_quality/` (validation, staleness), `digital_twin/` (store, engine, demo replay), `forecasting/` (features, models, pipeline), `explainability/`, `evaluation/` (protocol, metrics), `synthetic/` (generator). Entry points are in `scripts/` and `app/`.
 
-### Setup (macOS/Linux)
+## Data sources, licences and the synthetic-vs-real boundary
+Full details: [`data/README.md`](data/README.md). Summary:
 
+| Data | Real or synthetic | Used here? | Terms |
+|---|---|---|---|
+| Synthetic cohort (100 patients x 14 days) and 3-patient demo sample | **SYNTHETIC** | Yes, for all results and the demo | MIT (generated by this code) |
+| ShanghaiT2DM (type 2, real) | Real | **No** (optional local adapter, untested on real files) | Public on figshare; **licence unverified**, sources conflict; not redistributed |
+| DiaTrend (type 1, real) | Real | **No** | Controlled access (Synapse + agreement); no redistribution |
+
+The synthetic generator builds in meal schedules and a profile-to-glucose link, so gains from time-of-day or static EHR features on this data are **artifacts, not findings**. Type 1 results would not establish type 2 performance either.
+
+## Technical stack
+Python 3.12; pandas, NumPy, scikit-learn, LightGBM, joblib; SQLite (standard library); Streamlit + Plotly (dashboard); matplotlib (figures); pytest. Deck built with pptxgenjs (dev only). Pinned versions: [`requirements.txt`](requirements.txt).
+
+## Model
+* **Task**: input = last 5 CGM readings (60 min, 15-min grid) [+ time of day]; output = glucose at +15, +30, ..., +120 min.
+* **Baselines**: persistence (last value); ridge regression on the same features.
+* **Primary**: LightGBM, one model per horizon, predicting the *change* from the latest reading; fixed hyper-parameters (`glucotwin/config.py`). Feature variants tested: CGM-only, + time of day, + personal baseline (first 48 h), + static EHR fields. The variant is chosen **on validation patients only** by a pre-declared parsimony rule (simplest variant within 1% of the best validation MAE) -> currently `cgm_tod`.
+* **Uncertainty**: symmetric split-conformal intervals (80% nominal) calibrated on separate calibration patients; constant width per horizon; marginal (not per-patient) guarantee.
+* **Leakage controls**: patient-disjoint splits (60/10/10/20), first 48 h per patient never scored, scaler fit on train only, test patients touched only by `scripts/evaluate.py` with frozen models.
+
+## Setup
 ```bash
-cd GlucoTwin
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
+git clone <YOUR REPO URL> GlucoTwin && cd GlucoTwin
+python3 -m venv .venv && source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-python scripts/generate_synthetic_data.py
 ```
 
-### Run the dashboard
-
+## Run the dashboard (works immediately: sample data and a trained model are committed)
 ```bash
+python scripts/init_demo.py --reset        # creates data/runtime/glucotwin.sqlite with 3 SYNTHETIC patients
 streamlit run app/dashboard.py
 ```
+(If the database does not exist the app shows an empty state with an "Initialise SYNTHETIC demo patients" button.)
 
-The app trains/caches a small model from deterministic synthetic sequences on first use. Use **Generate / refresh forecast**, inject a later timestamped reading, then generate a fresh forecast. To test stale behavior, stop adding readings or use the quality unit tests; the demo UI avoids requiring a real device connection.
-
-### Run tests
-
+## Replay a sample stream
 ```bash
-pytest -q
+python scripts/replay_stream.py --patient SYNTH-001 --steps 12                    # each new reading updates state + forecast
+python scripts/replay_stream.py --patient SYNTH-001 --steps 12 --stop-after 6     # stream stops -> forecast withheld (stale)
 ```
+In the dashboard use the sidebar: **+15 min / +1 h** replays the recorded synthetic stream (no live device exists); the "Controlled data-quality tests" buttons inject a stopped stream, corrupted value, future timestamp, missing time zone and conflicting duplicate.
 
-### Reproduce benchmark
-
+## Train and evaluate (reproduces every number below; about 2 minutes)
 ```bash
-python scripts/evaluate.py
+python scripts/generate_synthetic_data.py     # data/generated/ (git-ignored) + data/sample_synthetic/
+python scripts/train.py                       # models/glucotwin_model.joblib, models/ablations/, experiments/model_selection.json
+python scripts/evaluate.py                    # experiments/results.json, experiments/benchmark_report.md, docs/figures/*.png
 ```
+`make all` runs data -> train -> evaluate -> demo -> test. Re-running gives bit-identical metrics (checked).
 
-This writes `experiments/benchmark_report.json` and `.md` with actual computed results. Metrics may vary with dependency versions; the seed and split are fixed. The benchmark is synthetic-only and does not establish clinical performance.
+## Actual benchmark results (SYNTHETIC test patients)
+<!-- RESULTS:START -->
+| Horizon (min) | Persistence MAE | Ridge MAE | LightGBM CGM-only MAE | **Primary** (`cgm_tod`) MAE | 80% interval coverage |
+|---|---|---|---|---|---|
+| 15 | 9.45 | 7.97 | 6.87 | **6.79** | 0.784 |
+| 30 | 15.52 | 12.48 | 11.05 | **10.92** | 0.790 |
+| 45 | 21.00 | 16.65 | 15.54 | **14.62** | 0.796 |
+| 60 | 25.64 | 20.08 | 19.30 | **17.20** | 0.795 |
+| 90 | 32.14 | 24.16 | 23.66 | **19.60** | 0.794 |
+| 120 | 35.27 | 25.50 | 24.85 | **20.55** | 0.796 |
 
-### Optional model artifact and stream replay
+MAE in mg/dL on **20 held-out SYNTHETIC test patients**, 20,825 scored windows, identical cases for all models. Data source(s): SYNTHETIC; data fingerprint `2a4bb446604a39157250b007e55b3928`; model `glucotwin-lgbm-cgm_tod-b09655ec`.
 
+- Primary vs persistence at +60 min: -8.44 mg/dL (95% patient-bootstrap CI -11.12 to -6.24); better for 20 of 20 patients.
+- Abstention (incomplete 60-min window): 6.4% of observed origins; out-of-distribution qualified: 1.12%.
+- Hyperglycaemia-onset event task (>180 mg/dL within 2 h): primary F1 0.688 (precision 0.608, recall 0.791); persistence recall 0 by construction.
+- Full tables, ablations, per-patient results and failure analysis: [`experiments/benchmark_report.md`](experiments/benchmark_report.md).
+<!-- RESULTS:END -->
+
+**Read this correctly.** The time-of-day gain is expected by construction (scheduled synthetic meals): the CGM-only LightGBM is only slightly better than ridge at +120 min. The personal-baseline variant gave only a tiny gain at +15 min (about 0.3 mg/dL; CI excludes zero) and no reliable gain from +30 min onward; static EHR fields gave no reliable gain at any horizon (CIs include zero). Interval coverage varies by patient. None of this transfers to real patients without real-data validation.
+
+## Tests
 ```bash
-python scripts/train.py
-python scripts/replay_stream.py
+python -m pytest -q
 ```
+**Last run: 54 passed** (in the working tree and in a fresh virtualenv installed only from `requirements.txt`). Coverage of the spec's DT-001..DT-018 scenarios: profile load, state update on new reading, duplicates, invalid input, missing/stale data, forecast structure, withheld forecasts, scenario separation, evaluation on identical cases, reproducibility, empty state, restart persistence, offline operation, leakage controls, explanation additivity, source labelling, and the dashboard via Streamlit's `AppTest`. As a sanity check, deliberately breaking the leakage, validation and staleness rules made the corresponding tests fail. Not tested: the real-data adapter on real files, the dashboard in a real browser.
 
-`train.py` writes a local joblib model artifact which is ignored by git. `replay_stream.py` demonstrates an observation update and writes a local audit log.
+## Known limitations
+* Synthetic data only; no clinical validation; population claims (type 2, India) are not supported.
+* Meals, exercise and medication are not modelled; the hardest cases are unannounced meal spikes (see the failure analysis).
+* Fixed 60-min window and 120-min horizon (initial choices, not shown optimal); one 14-day record per patient; one split seed.
+* Intervals are marginal and non-adaptive; some patients are under-covered.
+* The ShanghaiT2DM adapter encodes unverified assumptions (layout, units, time zone) and the dataset licence is unverified.
+* Dashboard replays a recorded stream; there is no device integration, authentication or privacy/regulatory hardening.
 
-## Evaluation protocol
+## Documentation map
+[`docs/RESEARCH.md`](docs/RESEARCH.md) (what was verified and what was not) · [`data/README.md`](data/README.md) · [`models/README.md`](models/README.md) · [`experiments/benchmark_report.md`](experiments/benchmark_report.md) · [`docs/DEMO_VIDEO_PLAN.md`](docs/DEMO_VIDEO_PLAN.md) · [`docs/SUBMISSION_CHECKLIST.md`](docs/SUBMISSION_CHECKLIST.md)
 
-- 5-minute synthetic observations; input is the previous 12 readings (60 minutes).
-- Target: glucose 30 minutes after the final input reading.
-- Split: 18 training synthetic patient IDs and 6 held-out synthetic patient IDs, no ID overlap.
-- Models: persistence (last observed value) and `HistGradientBoostingRegressor`.
-- Both models are scored on the same held-out target windows.
-- Metrics: MAE, RMSE and R². See `experiments/benchmark_report.md` for measured numbers and caveats.
-- No final test-set tuning was intentionally performed; this is a small engineering benchmark, not a clinical study.
+## Team contributions
+**Jidnyasa Patil - Research , model and integration**
+**Sajiree Damle - Full stack development and deployment**
 
-## Uncertainty, explanations and scenario limits
-
-The dashboard’s shaded range is a heuristic band based on in-sample training residuals, not a formally calibrated prediction interval. The explanation panel reports observable input summaries and avoids implying causal attribution. The what-if tool perturbs recent glucose values and shows the model response; it does not model a meal, medication, insulin, or any real intervention. It must not be interpreted as a treatment effect.
-
-## Tests and status
-
-Automated tests cover deterministic synthetic data, state update, duplicate/invalid/out-of-order rejection, stale/insufficient data warnings, feature construction, metrics, forecast structure and explicit failure when the model is untrained. Actual run results are recorded in `experiments/verification_report.md`. Streamlit was not installed in the execution container, so the interactive UI has not been smoke-tested here; it is included in requirements.txt.
-
-## License
-
-Source code: MIT License, see `LICENSE`. The MIT license does not grant rights to third-party datasets or cited publications. Data provenance and access notes are in `data/README.md`.
-
-## Remaining submission checklist
-
-- [ ] Replace team/institution placeholders with verified details.
-- [ ] Publish repository and test public access.
-- [ ] Record and publish an at-least-20-minute demo video; test link in a private/incognito browser.
-- [ ] Confirm official challenge deadline, eligibility and exact submission form requirements against the official challenge page.
-- [ ] Have a qualified clinician/research mentor review the framing and limitations.
-- [ ] If adding DiaTrend or any other real dataset, verify access, data terms, data dictionary, population, preprocessing and redistribution rights before training or publishing.
-- [ ] Capture real application screenshots and refresh presentation outcomes after the final run.
-
-## Demo-video plan (20:30+)
-
-1. **00:00–02:00:** Problem, target outcome and research-only disclaimer.
-2. **02:00–05:00:** Existing digital-twin literature and limitations.
-3. **05:00–08:00:** Architecture, synthetic provenance, and dataset decision.
-4. **08:00–12:00:** Open `SYNTH-001`, inspect context and chart, generate forecast, inject new observation, show state update and forecast refresh.
-5. **12:00–14:00:** Invalid/duplicate/stale data behavior and hypothetical scenario lab.
-6. **14:00–17:00:** Run tests and benchmark; show baseline comparison and failures/limitations.
-7. **17:00–19:00:** Privacy, uncertainty, non-causal interpretation and lack of clinical validation.
-8. **19:00–20:30+:** Repository, installation, commands, documentation and remaining work.
-
+## Licence
+MIT (code and synthetic sample data). Third-party packages and datasets: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
