@@ -15,7 +15,7 @@
 | 5 | Healthcare use case | See [Healthcare use case](#healthcare-use-case) |
 | 6 | Technical stack | See [Technical stack](#technical-stack) |
 | 7 | AI/ML model details | See [Model](#model) |
-| 8 | Public demo video (>= 20 min) | **[DEMO VIDEO URL - [`docs/DEMO_VIDEO_PLAN.md`](docs/DEMO_VIDEO_PLAN.md)]** |
+| 8 | Public demo video (>= 20 min) | **[DEMO VIDEO URL - https://youtu.be/1czyEqa0aPc** |
 | 9 | Open-source licence | MIT - [`LICENSE`](LICENSE); third-party notices in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) |
 | 10 | Architecture diagram (PDF) | [`docs/architecture.pdf`](docs/architecture.pdf) |
 | 11 | Presentation (PDF/PPT) | [`docs/presentation.pdf`](docs/presentation.pdf) / [`docs/presentation.pptx`](docs/presentation.pptx) |
