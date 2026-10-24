@@ -8,18 +8,18 @@
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Team details | **[TEAM NAME, MEMBERS, ROLES - to be filled by the team]** |
-| 2 | College / incubator | **[COLLEGE / INCUBATOR - to be filled]** |
+| 1 | Team details | **Coffee & Panic** |
+| 2 | College / incubator | **Marathwada Mitra Mandal's College of Engineering , Pune** |
 | 3 | Project title | GlucoTwin: an explainable, personalized glucose Digital Twin (*name provisional, see Known issues*) |
 | 4 | Problem statement | See [Problem statement](#problem-statement) |
 | 5 | Healthcare use case | See [Healthcare use case](#healthcare-use-case) |
 | 6 | Technical stack | See [Technical stack](#technical-stack) |
 | 7 | AI/ML model details | See [Model](#model) |
-| 8 | Public demo video (>= 20 min) | **[DEMO VIDEO URL - not yet recorded; plan in [`docs/DEMO_VIDEO_PLAN.md`](docs/DEMO_VIDEO_PLAN.md)]** |
+| 8 | Public demo video (>= 20 min) | **[DEMO VIDEO URL - [`docs/DEMO_VIDEO_PLAN.md`](docs/DEMO_VIDEO_PLAN.md)]** |
 | 9 | Open-source licence | MIT - [`LICENSE`](LICENSE); third-party notices in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) |
 | 10 | Architecture diagram (PDF) | [`docs/architecture.pdf`](docs/architecture.pdf) |
 | 11 | Presentation (PDF/PPT) | [`docs/presentation.pdf`](docs/presentation.pdf) / [`docs/presentation.pptx`](docs/presentation.pptx) |
-| 12 | Files and links publicly accessible | **[TO CONFIRM after the repository is made public]**; remaining items in [`docs/SUBMISSION_CHECKLIST.md`](docs/SUBMISSION_CHECKLIST.md) |
+| 12 | Files and links publicly accessible | **YES**|
 
 ## Problem statement
 Clinicians see a person's diabetes through sparse snapshots (visits, lab values), while a continuous glucose monitor (CGM) produces a reading every few minutes. GlucoTwin asks: can a **virtual patient state** that fuses historical (EHR-style) information with the live CGM stream, and updates with every new reading, support a **0-120 minute glucose forecast** that is explainable, comes with honest uncertainty, and refuses to answer when its input is unreliable?
