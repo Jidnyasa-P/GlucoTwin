@@ -10,7 +10,7 @@
 |---|---|---|
 | 1 | Team details | **Coffee & Panic** |
 | 2 | College / incubator | **Marathwada Mitra Mandal's College of Engineering , Pune** |
-| 3 | Project title | GlucoTwin: an explainable, personalized glucose Digital Twin (*name provisional, see Known issues*) |
+| 3 | Project title | GlucoTwin: an explainable, personalized glucose Digital Twin |
 | 4 | Problem statement | See [Problem statement](#problem-statement) |
 | 5 | Healthcare use case | See [Healthcare use case](#healthcare-use-case) |
 | 6 | Technical stack | See [Technical stack](#technical-stack) |
